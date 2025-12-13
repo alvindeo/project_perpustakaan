@@ -1,0 +1,124 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Book;
+use App\Models\Category;
+use Illuminate\Http\Request;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Illuminate\Support\Facades\Storage;
+
+class BookController extends Controller
+{
+    public function index()
+    {
+        $books = Book::with('category')->paginate(15);
+        return view('admin.books.index', compact('books'));
+    }
+
+    public function create()
+    {
+        $categories = Category::all();
+        return view('admin.books.form', compact('categories'));
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'isbn' => 'required|unique:books',
+            'title' => 'required',
+            'author' => 'required',
+            'category_id' => 'required|exists:categories,id',
+            'publisher' => 'nullable',
+            'publication_year' => 'nullable|integer',
+            'synopsis' => 'nullable',
+            'cover_image' => 'nullable|image|max:2048',
+            'stock' => 'required|integer|min:0',
+        ]);
+
+        $validated['available'] = $validated['stock'];
+
+        if ($request->hasFile('cover_image')) {
+            $validated['cover_image'] = $request->file('cover_image')->store('covers', 'public');
+        }
+
+        $book = Book::create($validated);
+
+        // Generate QR Code
+        $qrCode = QrCode::format('png')->size(300)->generate($book->isbn);
+        $qrPath = 'qrcodes/books/' . $book->id . '.png';
+        Storage::disk('public')->put($qrPath, $qrCode);
+        $book->update(['qr_code' => $qrPath]);
+
+        return redirect()->route('admin.books.index')->with('success', 'Buku berhasil ditambahkan');
+    }
+
+    public function show(Book $book)
+    {
+        $book->load('category', 'transactions');
+        return view('admin.books.show', compact('book'));
+    }
+
+    public function edit(Book $book)
+    {
+        $categories = Category::all();
+        return view('admin.books.form', compact('book', 'categories'));
+    }
+
+    public function update(Request $request, Book $book)
+    {
+        $validated = $request->validate([
+            'isbn' => 'required|unique:books,isbn,' . $book->id,
+            'title' => 'required',
+            'author' => 'required',
+            'category_id' => 'required|exists:categories,id',
+            'publisher' => 'nullable',
+            'publication_year' => 'nullable|integer',
+            'synopsis' => 'nullable',
+            'cover_image' => 'nullable|image|max:2048',
+            'stock' => 'required|integer|min:0',
+        ]);
+
+        // Update available count if stock changed
+        if ($validated['stock'] != $book->stock) {
+            $diff = $validated['stock'] - $book->stock;
+            $validated['available'] = max(0, $book->available + $diff);
+        }
+
+        if ($request->hasFile('cover_image')) {
+            if ($book->cover_image) {
+                Storage::disk('public')->delete($book->cover_image);
+            }
+            $validated['cover_image'] = $request->file('cover_image')->store('covers', 'public');
+        }
+
+        $book->update($validated);
+
+        return redirect()->route('admin.books.index')->with('success', 'Buku berhasil diupdate');
+    }
+
+    public function destroy(Book $book)
+    {
+        if ($book->cover_image) {
+            Storage::disk('public')->delete($book->cover_image);
+        }
+        if ($book->qr_code) {
+            Storage::disk('public')->delete($book->qr_code);
+        }
+
+        $book->delete();
+
+        return redirect()->route('admin.books.index')->with('success', 'Buku berhasil dihapus');
+    }
+
+    public function generateQR(Book $book)
+    {
+        if ($book->qr_code && Storage::disk('public')->exists($book->qr_code)) {
+            return response()->file(storage_path('app/public/' . $book->qr_code));
+        }
+
+        $qrCode = QrCode::format('png')->size(300)->generate($book->isbn);
+        return response($qrCode)->header('Content-Type', 'image/png');
+    }
+}
