@@ -25,7 +25,7 @@ Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 // Member routes (requires authentication and member role)
-Route::middleware(['auth', 'role:member'])->prefix('member')->name('member.')->group(function () {
+Route::middleware(['auth:member', 'guard.check:member'])->prefix('member')->name('member.')->group(function () {
     Route::get('/dashboard', [MemberController::class, 'dashboard'])->name('dashboard');
     Route::get('/profile', [MemberController::class, 'profile'])->name('profile');
     Route::get('/history', [MemberController::class, 'history'])->name('history');
@@ -34,10 +34,14 @@ Route::middleware(['auth', 'role:member'])->prefix('member')->name('member.')->g
     // Booking routes
     Route::post('/bookings', [BookingController::class, 'store'])->name('bookings.store');
     Route::delete('/bookings/{booking}', [BookingController::class, 'destroy'])->name('bookings.destroy');
+    
+    // Self-service borrow and return
+    Route::post('/borrow', [MemberController::class, 'borrowBook'])->name('borrow');
+    Route::post('/return/{transaction}', [MemberController::class, 'returnBook'])->name('return');
 });
 
 // Admin routes (requires authentication and admin/librarian role)
-Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth:admin', 'guard.check:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     
     // Book management
@@ -48,17 +52,25 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::resource('members', MemberManagementController::class);
     Route::get('members/{member}/qrcode', [MemberManagementController::class, 'generateQR'])->name('members.qrcode');
     
+    // Borrowings Management
+    Route::get('/borrowings', [App\Http\Controllers\Admin\BorrowingController::class, 'index'])->name('borrowings.index');
+    Route::delete('/borrowings/{transaction}', [App\Http\Controllers\Admin\BorrowingController::class, 'destroy'])->name('borrowings.destroy');
+    
+    // Bookings Management
+    Route::get('/bookings', [App\Http\Controllers\Admin\BookingManagementController::class, 'index'])->name('bookings.index');
+    Route::delete('/bookings/{booking}', [App\Http\Controllers\Admin\BookingManagementController::class, 'destroy'])->name('bookings.destroy');
+    
+    // Transaction History
+    Route::get('/transactions', [App\Http\Controllers\Admin\TransactionController::class, 'history'])->name('transactions.history');
+    Route::get('/transactions/{transaction}/edit', [App\Http\Controllers\Admin\TransactionController::class, 'edit'])->name('transactions.edit');
+    Route::put('/transactions/{transaction}', [App\Http\Controllers\Admin\TransactionController::class, 'update'])->name('transactions.update');
+    Route::delete('/transactions/{transaction}', [App\Http\Controllers\Admin\TransactionController::class, 'destroy'])->name('transactions.destroy');
+    
     // Circulation
-    Route::get('/circulation/borrow', [CirculationController::class, 'borrowForm'])->name('circulation.borrow');
-    Route::post('/circulation/borrow', [CirculationController::class, 'processBorrow'])->name('circulation.process-borrow');
-    Route::get('/circulation/return', [CirculationController::class, 'returnForm'])->name('circulation.return');
-    Route::post('/circulation/return', [CirculationController::class, 'processReturn'])->name('circulation.process-return');
-    Route::get('/circulation/history', [CirculationController::class, 'history'])->name('circulation.history');
+    Route::post('/circulation/borrow', [CirculationController::class, 'borrow'])->name('circulation.borrow');
+    Route::post('/circulation/return/{transaction}', [CirculationController::class, 'return'])->name('circulation.return');
     
     // Reports
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-    Route::get('/reports/popular-books', [ReportController::class, 'popularBooks'])->name('reports.popular-books');
-    Route::get('/reports/overdue', [ReportController::class, 'overdue'])->name('reports.overdue');
-    Route::get('/reports/fines', [ReportController::class, 'fines'])->name('reports.fines');
     Route::get('/reports/export/{type}', [ReportController::class, 'export'])->name('reports.export');
 });

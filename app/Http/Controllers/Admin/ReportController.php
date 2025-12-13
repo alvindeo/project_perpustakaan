@@ -15,7 +15,22 @@ class ReportController extends Controller
 {
     public function index()
     {
-        return view('admin.reports.index');
+        $stats = [
+            'total_transactions' => Transaction::count(),
+            'active_borrowings' => Transaction::where('status', 'borrowed')->count(),
+            'overdue_count' => Transaction::where('status', 'borrowed')
+                ->where('due_date', '<', now())
+                ->count(),
+            'total_fines' => Fine::where('status', 'unpaid')->sum('amount'),
+        ];
+        
+        $popular_books = Book::withCount('transactions')
+            ->with('category')
+            ->orderBy('transactions_count', 'desc')
+            ->take(10)
+            ->get();
+        
+        return view('admin.reports.index', compact('stats', 'popular_books'));
     }
 
     public function popularBooks()

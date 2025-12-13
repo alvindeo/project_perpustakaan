@@ -11,8 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Multi-guard authentication handles role checking
         $middleware->alias([
-            'role' => \App\Http\Middleware\CheckRole::class,
+            'guard.check' => \App\Http\Middleware\EnsureCorrectGuard::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -46,8 +46,8 @@ class OpacController extends Controller
         $isAvailable = $book->isAvailable();
         
         // Get current user's member record if logged in
-        $member = auth()->check() && auth()->user()->isMember() 
-            ? auth()->user()->member 
+        $member = auth()->check() && auth('member')->user()->isMember() 
+            ? auth('member')->user()->member 
             : null;
         
         // Check if user has active booking for this book

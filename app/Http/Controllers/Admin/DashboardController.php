@@ -15,24 +15,24 @@ class DashboardController extends Controller
     {
         $stats = [
             'total_books' => Book::count(),
-            'total_members' => Member::where('status', 'active')->count(),
+            'active_members' => Member::where('status', 'active')->count(),
             'active_borrowings' => Transaction::where('status', 'borrowed')->count(),
-            'overdue_books' => Transaction::where('status', 'overdue')->count(),
-            'total_fines' => Fine::where('status', 'unpaid')->sum('amount'),
+            'overdue_books' => Transaction::where('status', 'borrowed')
+                ->where('due_date', '<', now())
+                ->count(),
         ];
 
-        $recentTransactions = Transaction::with(['member', 'book'])
+        $recent_transactions = Transaction::with(['member', 'book'])
             ->orderBy('created_at', 'desc')
             ->take(10)
             ->get();
 
-        $popularBooks = Book::withCount(['transactions' => function($query) {
-            $query->where('created_at', '>=', now()->subDays(30));
-        }])
-        ->orderBy('transactions_count', 'desc')
-        ->take(5)
-        ->get();
+        $popular_books = Book::withCount('transactions')
+            ->with('category')
+            ->orderBy('transactions_count', 'desc')
+            ->take(5)
+            ->get();
 
-        return view('admin.dashboard', compact('stats', 'recentTransactions', 'popularBooks'));
+        return view('admin.dashboard', compact('stats', 'recent_transactions', 'popular_books'));
     }
 }

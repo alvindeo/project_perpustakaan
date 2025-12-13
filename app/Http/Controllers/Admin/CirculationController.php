@@ -18,40 +18,27 @@ class CirculationController extends Controller
         return view('admin.circulation.borrow');
     }
 
-    public function processBorrow(Request $request)
+    public function borrow(Request $request)
     {
         $validated = $request->validate([
-            'member_code' => 'required|exists:members,member_code',
-            'isbn' => 'required|exists:books,isbn',
+            'member_id' => 'required|exists:members,id',
+            'book_id' => 'required|exists:books,id',
         ]);
 
-        $member = Member::where('member_code', $validated['member_code'])->first();
-        $book = Book::where('isbn', $validated['isbn'])->first();
+        $member = Member::findOrFail($validated['member_id']);
+        $book = Book::findOrFail($validated['book_id']);
 
         // Check member status
         if ($member->status !== 'active') {
-            return back()->with('error', 'Anggota tidak aktif');
+            return back()->with('error', 'Member is not active');
         }
 
         // Check if book is available
         if ($book->available <= 0) {
-            return back()->with('error', 'Buku tidak tersedia');
+            return back()->with('error', 'Book is not available');
         }
 
-        // Check max borrowing limit
-        $maxBooks = LibraryInfo::get('max_books_per_member', 3);
-        $currentBorrowings = $member->activeBorrowings()->count();
-        
-        if ($currentBorrowings >= $maxBooks) {
-            return back()->with('error', 'Anggota sudah mencapai batas maksimal peminjaman (' . $maxBooks . ' buku)');
-        }
-
-        // Check if member has unpaid fines
-        if ($member->totalUnpaidFines() > 0) {
-            return back()->with('error', 'Anggota memiliki denda yang belum dibayar');
-        }
-
-        $borrowDays = LibraryInfo::get('max_borrow_days', 7);
+        $borrowDays = (int) LibraryInfo::get('max_borrow_days', 7);
 
         // Create transaction
         $transaction = Transaction::create([
@@ -65,38 +52,21 @@ class CirculationController extends Controller
         // Update book availability
         $book->decrement('available');
 
-        // Cancel any pending booking for this book by this member
-        $member->bookings()
-            ->where('book_id', $book->id)
-            ->where('status', 'pending')
-            ->update(['status' => 'fulfilled']);
+        // Cancel any pending booking
+        if ($request->has('booking_id')) {
+            $booking = \App\Models\Booking::find($request->booking_id);
+            if ($booking) {
+                $booking->update(['status' => 'fulfilled']);
+            }
+        }
 
-        return back()->with('success', 'Peminjaman berhasil. Batas pengembalian: ' . $transaction->due_date->format('d/m/Y'));
+        return back()->with('success', 'Book borrowed successfully. Due date: ' . $transaction->due_date->format('d M Y'));
     }
 
-    public function returnForm()
+    public function return(Transaction $transaction)
     {
-        return view('admin.circulation.return');
-    }
-
-    public function processReturn(Request $request)
-    {
-        $validated = $request->validate([
-            'member_code' => 'required|exists:members,member_code',
-            'isbn' => 'required|exists:books,isbn',
-        ]);
-
-        $member = Member::where('member_code', $validated['member_code'])->first();
-        $book = Book::where('isbn', $validated['isbn'])->first();
-
-        // Find active transaction
-        $transaction = Transaction::where('member_id', $member->id)
-            ->where('book_id', $book->id)
-            ->where('status', 'borrowed')
-            ->first();
-
-        if (!$transaction) {
-            return back()->with('error', 'Tidak ada transaksi peminjaman aktif untuk buku ini');
+        if ($transaction->status !== 'borrowed') {
+            return back()->with('error', 'This transaction is not active');
         }
 
         // Update transaction
@@ -106,7 +76,7 @@ class CirculationController extends Controller
         ]);
 
         // Update book availability
-        $book->increment('available');
+        $transaction->book->increment('available');
 
         // Check if overdue and create fine
         if ($transaction->isOverdue()) {
@@ -116,16 +86,16 @@ class CirculationController extends Controller
 
             Fine::create([
                 'transaction_id' => $transaction->id,
-                'member_id' => $member->id,
+                'member_id' => $transaction->member_id,
                 'days_overdue' => $daysOverdue,
                 'amount' => $fineAmount,
                 'status' => 'unpaid',
             ]);
 
-            return back()->with('warning', 'Pengembalian berhasil. Terlambat ' . $daysOverdue . ' hari. Denda: Rp ' . number_format($fineAmount, 0, ',', '.'));
+            return back()->with('warning', 'Book returned. Overdue ' . $daysOverdue . ' days. Fine: Rp ' . number_format($fineAmount));
         }
 
-        return back()->with('success', 'Pengembalian berhasil');
+        return back()->with('success', 'Book returned successfully');
     }
 
     public function history()

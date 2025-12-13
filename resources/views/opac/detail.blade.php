@@ -41,17 +41,37 @@
                     </div>
                 @endif
                 
-                @auth
-                    @if(auth()->user()->isMember())
+                @auth('member')
+                    @if(auth('member')->user()->isMember())
                         <div class="mt-3">
-                            @if(!$isAvailable && !$hasBooking)
-                                <form action="{{ route('member.bookings.store') }}" method="POST">
-                                    @csrf
-                                    <input type="hidden" name="book_id" value="{{ $book->id }}">
-                                    <button type="submit" class="btn btn-warning">📅 Booking Buku</button>
-                                </form>
-                            @elseif($hasBooking)
-                                <p class="alert alert-success">Anda sudah membooking buku ini</p>
+                            @if($isAvailable)
+                                <div style="display: flex; gap: 1rem;">
+                                    <!-- Borrow Button -->
+                                    <form action="{{ route('member.borrow') }}" method="POST" style="flex: 1;">
+                                        @csrf
+                                        <input type="hidden" name="book_id" value="{{ $book->id }}">
+                                        <button type="submit" class="btn btn-primary" style="width: 100%;">📖 Borrow Now</button>
+                                    </form>
+                                    
+                                    <!-- Booking Button -->
+                                    @if(!$hasBooking)
+                                        <form action="{{ route('member.bookings.store') }}" method="POST" style="flex: 1;">
+                                            @csrf
+                                            <input type="hidden" name="book_id" value="{{ $book->id }}">
+                                            <button type="submit" class="btn btn-outline" style="width: 100%;">🔖 Book for Later</button>
+                                        </form>
+                                    @endif
+                                </div>
+                            @else
+                                @if(!$hasBooking)
+                                    <form action="{{ route('member.bookings.store') }}" method="POST">
+                                        @csrf
+                                        <input type="hidden" name="book_id" value="{{ $book->id }}">
+                                        <button type="submit" class="btn btn-warning">📅 Booking Buku</button>
+                                    </form>
+                                @elseif($hasBooking)
+                                    <p class="alert alert-success">Anda sudah membooking buku ini</p>
+                                @endif
                             @endif
                         </div>
                     @endif

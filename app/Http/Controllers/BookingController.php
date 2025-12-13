@@ -11,7 +11,7 @@ class BookingController extends Controller
 {
     public function store(Request $request)
     {
-        $member = auth()->user()->member;
+        $member = auth('member')->user()->member;
         
         // Check if member already has an active booking
         if ($member->hasActiveBooking()) {
@@ -25,7 +25,7 @@ class BookingController extends Controller
             return back()->with('error', 'Buku tidak tersedia untuk dibooking.');
         }
 
-        $maxDays = LibraryInfo::get('max_borrow_days', 7);
+        $maxDays = (int) LibraryInfo::get('max_borrow_days', 7);
         
         Booking::create([
             'member_id' => $member->id,
@@ -40,7 +40,7 @@ class BookingController extends Controller
 
     public function destroy(Booking $booking)
     {
-        $member = auth()->user()->member;
+        $member = auth('member')->user()->member;
         
         // Ensure the booking belongs to the member
         if ($booking->member_id !== $member->id) {

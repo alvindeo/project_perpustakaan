@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Perpustakaan SMA Dian Nuswantoro')</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('favicon.png') }}">
+    <link rel="shortcut icon" href="{{ asset('favicon.png') }}">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -26,19 +32,23 @@
                 <a href="{{ route('info') }}" class="nav-link">Informasi</a>
                 <a href="{{ route('events') }}" class="nav-link">Event</a>
                 
-                @auth
-                    @if(auth()->user()->isAdmin())
+                @if(auth('admin')->check() || auth('member')->check())
+                    @if(auth('admin')->check())
                         <a href="{{ route('admin.dashboard') }}" class="nav-link">Dashboard Admin</a>
-                    @else
+                        <form action="{{ route('logout') }}" method="POST" style="display: inline;">
+                            @csrf
+                            <button type="submit" class="btn btn-outline">Logout (Admin)</button>
+                        </form>
+                    @elseif(auth('member')->check())
                         <a href="{{ route('member.dashboard') }}" class="nav-link">Dashboard Saya</a>
+                        <form action="{{ route('logout') }}" method="POST" style="display: inline;">
+                            @csrf
+                            <button type="submit" class="btn btn-outline">Logout</button>
+                        </form>
                     @endif
-                    <form action="{{ route('logout') }}" method="POST" style="display: inline;">
-                        @csrf
-                        <button type="submit" class="btn btn-outline">Logout</button>
-                    </form>
                 @else
                     <a href="{{ route('login') }}" class="btn btn-primary">Login</a>
-                @endauth
+                @endif
             </div>
         </div>
     </nav>
