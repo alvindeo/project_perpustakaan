@@ -71,7 +71,7 @@
 
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 Perpustakaan SMA Dian Nuswantoro. All rights reserved.</p>
+            <p>&copy; 2025 Perpustakaan SMA Dian Nuswantoro. All rights reserved.</p>
         </div>
     </footer>
 
