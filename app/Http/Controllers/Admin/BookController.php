@@ -39,7 +39,7 @@ class BookController extends Controller
     public function create()
     {
         $categories = Category::all();
-        return view('admin.books.form', compact('categories'));
+        return view('admin.books.create', compact('categories'));
     }
 
     public function store(Request $request)
@@ -64,11 +64,19 @@ class BookController extends Controller
 
         $book = Book::create($validated);
 
-        // Generate QR Code
-        $qrCode = QrCode::format('png')->size(300)->generate($book->isbn);
-        $qrPath = 'qrcodes/books/' . $book->id . '.png';
-        Storage::disk('public')->put($qrPath, $qrCode);
-        $book->update(['qr_code' => $qrPath]);
+        // Generate QR Code using SVG format (no image extension required)
+        try {
+            $qrCode = QrCode::format('svg')
+                ->size(300)
+                ->errorCorrection('H')
+                ->generate($book->isbn);
+            $qrPath = 'qrcodes/books/' . $book->id . '.svg';
+            Storage::disk('public')->put($qrPath, $qrCode);
+            $book->update(['qr_code' => $qrPath]);
+        } catch (\Exception $e) {
+            // If QR generation fails, continue without it
+            \Log::warning('QR Code generation failed: ' . $e->getMessage());
+        }
 
         return redirect()->route('admin.books.index')->with('success', 'Buku berhasil ditambahkan');
     }
@@ -82,7 +90,7 @@ class BookController extends Controller
     public function edit(Book $book)
     {
         $categories = Category::all();
-        return view('admin.books.form', compact('book', 'categories'));
+        return view('admin.books.edit', compact('book', 'categories'));
     }
 
     public function update(Request $request, Book $book)
@@ -134,10 +142,12 @@ class BookController extends Controller
     public function generateQR(Book $book)
     {
         if ($book->qr_code && Storage::disk('public')->exists($book->qr_code)) {
-            return response()->file(storage_path('app/public/' . $book->qr_code));
+            $content = Storage::disk('public')->get($book->qr_code);
+            $contentType = str_ends_with($book->qr_code, '.svg') ? 'image/svg+xml' : 'image/png';
+            return response($content)->header('Content-Type', $contentType);
         }
 
-        $qrCode = QrCode::format('png')->size(300)->generate($book->isbn);
-        return response($qrCode)->header('Content-Type', 'image/png');
+        $qrCode = QrCode::format('svg')->size(300)->generate($book->isbn);
+        return response($qrCode)->header('Content-Type', 'image/svg+xml');
     }
 }
